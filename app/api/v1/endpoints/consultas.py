@@ -131,7 +131,7 @@ async def get_solicitud_atencion(
 # ================================================================
 # 1. Crear cita
 # ================================================================
-@router.post("/", response_model=CitaResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/cita", response_model=CitaResponse, status_code=status.HTTP_201_CREATED)
 async def create_cita(
     cita_data: CitaCreate,
     db: Session = Depends(get_db)
@@ -177,7 +177,7 @@ async def create_cita(
 # ================================================================
 # 2. Obtener lista de citas
 # ================================================================
-@router.get("/", response_model=List[CitaResponse])
+@router.get("/cita", response_model=List[CitaResponse])
 async def get_citas(
     db: Session = Depends(get_db),
     estado: Optional[str] = Query(None, description="Filtrar por estado"),
@@ -211,7 +211,7 @@ async def get_citas(
 # ================================================================
 # 3. Obtener cita por ID
 # ================================================================
-@router.get("/{cita_id}", response_model=CitaResponse)
+@router.get("/cita/{cita_id}", response_model=CitaResponse)
 async def get_cita(
     cita_id: int,
     db: Session = Depends(get_db)
