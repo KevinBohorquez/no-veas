@@ -1,4 +1,4 @@
-# app/api/v1/endpoints/consultas.py
+# app/api/v1/endpoints/consultas.py - VERSIÓN CORREGIDA
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
@@ -23,6 +23,8 @@ from app.schemas.base_schema import MessageResponse
 
 router = APIRouter()
 
+
+# ===== RUTAS ESPECÍFICAS PRIMERO (ANTES DE LAS RUTAS CON PARÁMETROS) =====
 
 @router.post("/solicitudes/", response_model=SolicitudAtencionResponse, status_code=status.HTTP_201_CREATED)
 async def create_solicitud_atencion(
@@ -54,6 +56,7 @@ async def create_solicitud_atencion(
         # Agregar timestamp actual si no se proporciona
         solicitud_dict = solicitud_data.dict()
         solicitud_dict['fecha_hora_solicitud'] = solicitud_dict.get('fecha_hora_solicitud', datetime.now())
+        solicitud_dict['estado'] = 'Pendiente'  # Estado inicial
 
         # Crear la solicitud
         nueva_solicitud = solicitud_atencion.create(db, obj_in=solicitud_dict)
@@ -124,6 +127,189 @@ async def get_solicitud_atencion(
             detail=f"Error al obtener solicitud: {str(e)}"
         )
 
+
+@router.get("/search")
+async def search_consultas_endpoint(
+        db: Session = Depends(get_db),
+        page: int = Query(1, ge=1, description="Número de página"),
+        per_page: int = Query(20, ge=1, le=100, description="Elementos por página"),
+        id_veterinario: Optional[int] = Query(None, description="Filtrar por veterinario"),
+        fecha_desde: Optional[date] = Query(None, description="Fecha desde (YYYY-MM-DD)"),
+        fecha_hasta: Optional[date] = Query(None, description="Fecha hasta (YYYY-MM-DD)"),
+        condicion_general: Optional[str] = Query(None, description="Filtrar por condición"),
+        es_seguimiento: Optional[bool] = Query(None, description="Filtrar seguimientos")
+):
+    """
+    Buscar consultas con filtros avanzados
+    """
+    try:
+        search_params = ConsultaSearch(
+            id_veterinario=id_veterinario,
+            fecha_desde=fecha_desde,
+            fecha_hasta=fecha_hasta,
+            condicion_general=condicion_general,
+            es_seguimiento=es_seguimiento,
+            page=page,
+            per_page=per_page
+        )
+
+        consultas_result, total = consulta.search_consultas(db, search_params=search_params)
+
+        return {
+            "consultas": consultas_result,
+            "total": total,
+            "page": search_params.page,
+            "per_page": search_params.per_page,
+            "total_pages": (total + search_params.per_page - 1) // search_params.per_page
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error en búsqueda de consultas: {str(e)}"
+        )
+
+
+@router.get("/estadisticas/resumen")
+async def get_estadisticas_consultas(
+        db: Session = Depends(get_db),
+        fecha_desde: Optional[date] = Query(None, description="Fecha desde"),
+        fecha_hasta: Optional[date] = Query(None, description="Fecha hasta")
+):
+    """
+    Obtener estadísticas de consultas
+    """
+    try:
+        # Estadísticas por condición general
+        stats_condicion = consulta.get_estadisticas_por_condicion(db)
+
+        # Consultas de seguimiento
+        seguimientos = consulta.get_seguimientos(db)
+
+        # Si hay rango de fechas, filtrar consultas por fecha
+        if fecha_desde and fecha_hasta:
+            search_params = ConsultaSearch(
+                fecha_desde=fecha_desde,
+                fecha_hasta=fecha_hasta,
+                page=1,
+                per_page=1000  # Para obtener todas y contar
+            )
+            consultas_periodo, total_periodo = consulta.search_consultas(db, search_params=search_params)
+        else:
+            total_periodo = db.query(Consulta).count()
+
+        # Diagnósticos más frecuentes
+        diagnosticos_frecuentes = diagnostico.get_mas_frecuentes(db, limit=5)
+
+        return {
+            "periodo": {
+                "fecha_desde": fecha_desde,
+                "fecha_hasta": fecha_hasta,
+                "total_consultas": total_periodo
+            },
+            "estadisticas_condicion": stats_condicion,
+            "total_seguimientos": len(seguimientos),
+            "diagnosticos_frecuentes": diagnosticos_frecuentes
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener estadísticas: {str(e)}"
+        )
+
+
+@router.get("/hoy/agenda")
+async def get_consultas_hoy(
+        db: Session = Depends(get_db)
+):
+    """
+    Obtener consultas del día actual
+    """
+    try:
+        hoy = date.today()
+        consultas_hoy = consulta.get_por_fecha(db, fecha=hoy)
+
+        # Organizar por veterinario
+        consultas_por_veterinario = {}
+        for c in consultas_hoy:
+            vet_id = c.id_veterinario
+            if vet_id not in consultas_por_veterinario:
+                vet_obj = veterinario.get(db, vet_id)
+                consultas_por_veterinario[vet_id] = {
+                    "veterinario": f"{vet_obj.nombre} {vet_obj.apellido_paterno}" if vet_obj else "Desconocido",
+                    "consultas": []
+                }
+            consultas_por_veterinario[vet_id]["consultas"].append(c)
+
+        return {
+            "fecha": hoy,
+            "total_consultas": len(consultas_hoy),
+            "consultas_por_veterinario": list(consultas_por_veterinario.values()),
+            "consultas_detalle": consultas_hoy
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener consultas de hoy: {str(e)}"
+        )
+
+
+@router.get("/veterinario/{veterinario_id}")
+async def get_consultas_by_veterinario(
+        veterinario_id: int,
+        db: Session = Depends(get_db),
+        fecha_desde: Optional[date] = Query(None, description="Fecha desde"),
+        fecha_hasta: Optional[date] = Query(None, description="Fecha hasta"),
+        limit: int = Query(50, ge=1, le=100, description="Límite de resultados")
+):
+    """
+    Obtener consultas realizadas por un veterinario
+    """
+    try:
+        # Verificar que el veterinario existe
+        veterinario_obj = veterinario.get(db, veterinario_id)
+        if not veterinario_obj:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Veterinario no encontrado"
+            )
+
+        consultas_list = consulta.get_by_veterinario(
+            db,
+            veterinario_id=veterinario_id,
+            fecha_inicio=fecha_desde,
+            fecha_fin=fecha_hasta
+        )
+
+        # Limitar resultados
+        consultas_list = consultas_list[:limit]
+
+        return {
+            "veterinario": {
+                "id_veterinario": veterinario_obj.id_veterinario,
+                "nombre": f"{veterinario_obj.nombre} {veterinario_obj.apellido_paterno}"
+            },
+            "consultas": consultas_list,
+            "total": len(consultas_list),
+            "filtros": {
+                "fecha_desde": fecha_desde,
+                "fecha_hasta": fecha_hasta
+            }
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener consultas del veterinario: {str(e)}"
+        )
+
+
+# ===== RUTAS GENERALES (DESPUÉS DE LAS ESPECÍFICAS) =====
+
 @router.post("/", response_model=ConsultaResponse, status_code=status.HTTP_201_CREATED)
 async def create_consulta(
         consulta_data: ConsultaCreate,
@@ -181,7 +367,6 @@ async def create_consulta(
             )
 
         # Agregar evento al historial clínico
-        # Obtener ID de mascota desde el triaje -> solicitud
         if solicitud_obj:
             historial_clinico.add_evento_consulta(
                 db,
@@ -244,6 +429,8 @@ async def get_consultas(
             detail=f"Error al obtener consultas: {str(e)}"
         )
 
+
+# ===== RUTAS CON PARÁMETROS AL FINAL =====
 
 @router.get("/{consulta_id}", response_model=ConsultaResponse)
 async def get_consulta(
@@ -564,168 +751,4 @@ async def finalizar_consulta(
         raise HTTPException(
             status_code=500,
             detail=f"Error al finalizar consulta: {str(e)}"
-        )
-
-
-@router.post("/search")
-async def search_consultas(
-        search_params: ConsultaSearch,
-        db: Session = Depends(get_db)
-):
-    """
-    Buscar consultas con filtros avanzados
-    """
-    try:
-        consultas_result, total = consulta.search_consultas(db, search_params=search_params)
-
-        return {
-            "consultas": consultas_result,
-            "total": total,
-            "page": search_params.page,
-            "per_page": search_params.per_page,
-            "total_pages": (total + search_params.per_page - 1) // search_params.per_page
-        }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error en búsqueda de consultas: {str(e)}"
-        )
-
-
-@router.get("/veterinario/{veterinario_id}")
-async def get_consultas_by_veterinario(
-        veterinario_id: int,
-        db: Session = Depends(get_db),
-        fecha_desde: Optional[date] = Query(None, description="Fecha desde"),
-        fecha_hasta: Optional[date] = Query(None, description="Fecha hasta"),
-        limit: int = Query(50, ge=1, le=100, description="Límite de resultados")
-):
-    """
-    Obtener consultas realizadas por un veterinario
-    """
-    try:
-        # Verificar que el veterinario existe
-        veterinario_obj = veterinario.get(db, veterinario_id)
-        if not veterinario_obj:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Veterinario no encontrado"
-            )
-
-        consultas_list = consulta.get_by_veterinario(
-            db,
-            veterinario_id=veterinario_id,
-            fecha_inicio=fecha_desde,
-            fecha_fin=fecha_hasta
-        )
-
-        # Limitar resultados
-        consultas_list = consultas_list[:limit]
-
-        return {
-            "veterinario": {
-                "id_veterinario": veterinario_obj.id_veterinario,
-                "nombre": f"{veterinario_obj.nombre} {veterinario_obj.apellido_paterno}"
-            },
-            "consultas": consultas_list,
-            "total": len(consultas_list),
-            "filtros": {
-                "fecha_desde": fecha_desde,
-                "fecha_hasta": fecha_hasta
-            }
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error al obtener consultas del veterinario: {str(e)}"
-        )
-
-
-@router.get("/estadisticas/resumen")
-async def get_estadisticas_consultas(
-        db: Session = Depends(get_db),
-        fecha_desde: Optional[date] = Query(None, description="Fecha desde"),
-        fecha_hasta: Optional[date] = Query(None, description="Fecha hasta")
-):
-    """
-    Obtener estadísticas de consultas
-    """
-    try:
-        # Estadísticas por condición general
-        stats_condicion = consulta.get_estadisticas_por_condicion(db)
-
-        # Consultas de seguimiento
-        seguimientos = consulta.get_seguimientos(db)
-
-        # Si hay rango de fechas, filtrar consultas por fecha
-        if fecha_desde and fecha_hasta:
-            search_params = ConsultaSearch(
-                fecha_desde=fecha_desde,
-                fecha_hasta=fecha_hasta,
-                page=1,
-                per_page=1000  # Para obtener todas y contar
-            )
-            consultas_periodo, total_periodo = consulta.search_consultas(db, search_params=search_params)
-        else:
-            total_periodo = db.query(Consulta).count()
-
-        # Diagnósticos más frecuentes
-        diagnosticos_frecuentes = diagnostico.get_mas_frecuentes(db, limit=5)
-
-        return {
-            "periodo": {
-                "fecha_desde": fecha_desde,
-                "fecha_hasta": fecha_hasta,
-                "total_consultas": total_periodo
-            },
-            "estadisticas_condicion": stats_condicion,
-            "total_seguimientos": len(seguimientos),
-            "diagnosticos_frecuentes": diagnosticos_frecuentes
-        }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error al obtener estadísticas: {str(e)}"
-        )
-
-
-@router.get("/hoy/agenda")
-async def get_consultas_hoy(
-        db: Session = Depends(get_db)
-):
-    """
-    Obtener consultas del día actual
-    """
-    try:
-        hoy = date.today()
-        consultas_hoy = consulta.get_por_fecha(db, fecha=hoy)
-
-        # Organizar por veterinario
-        consultas_por_veterinario = {}
-        for c in consultas_hoy:
-            vet_id = c.id_veterinario
-            if vet_id not in consultas_por_veterinario:
-                vet_obj = veterinario.get(db, vet_id)
-                consultas_por_veterinario[vet_id] = {
-                    "veterinario": f"{vet_obj.nombre} {vet_obj.apellido_paterno}" if vet_obj else "Desconocido",
-                    "consultas": []
-                }
-            consultas_por_veterinario[vet_id]["consultas"].append(c)
-
-        return {
-            "fecha": hoy,
-            "total_consultas": len(consultas_hoy),
-            "consultas_por_veterinario": list(consultas_por_veterinario.values()),
-            "consultas_detalle": consultas_hoy
-        }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error al obtener consultas de hoy: {str(e)}"
         )
