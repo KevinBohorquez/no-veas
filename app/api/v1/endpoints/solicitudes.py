@@ -15,7 +15,7 @@ from app.schemas.base_schema import MessageResponse
 
 router = APIRouter()
 
-@router.post("/solicitudes/", response_model=SolicitudAtencionResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=SolicitudAtencionResponse, status_code=status.HTTP_201_CREATED)
 async def create_solicitud_atencion(
         solicitud_data: SolicitudAtencionCreate,
         db: Session = Depends(get_db)
@@ -61,7 +61,7 @@ async def create_solicitud_atencion(
         )
 
 
-    @router.get("/solicitudes/", response_model=List[SolicitudAtencionResponse])
+    @router.get("/", response_model=List[SolicitudAtencionResponse])
     async def get_solicitudes_atencion(
             db: Session = Depends(get_db),
             estado: Optional[str] = Query(None, description="Filtrar por estado"),
@@ -91,7 +91,7 @@ async def create_solicitud_atencion(
             )
 
 
-@router.get("/solicitudes/{solicitud_id}", response_model=SolicitudAtencionResponse)
+@router.get("/{solicitud_id}", response_model=SolicitudAtencionResponse)
 async def get_solicitud_atencion(
         solicitud_id: int,
         db: Session = Depends(get_db)
@@ -118,7 +118,7 @@ async def get_solicitud_atencion(
 
 
 # OPCIONAL: Endpoint para actualizar estado de solicitud
-@router.patch("/solicitudes/{solicitud_id}/estado")
+@router.patch("/{solicitud_id}/estado")
 async def actualizar_estado_solicitud(
         solicitud_id: int,
         nuevo_estado: str = Query(..., description="Nuevo estado de la solicitud"),
