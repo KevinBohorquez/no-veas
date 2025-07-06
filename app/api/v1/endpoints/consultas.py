@@ -7,7 +7,7 @@ from datetime import datetime, date
 from app.config.database import get_db
 from app.crud.consulta_crud import (
     consulta, diagnostico, tratamiento, historial_clinico,
-    triaje, solicitud_atencion
+    triaje, solicitud_atencion, cita
 )
 from app.crud.veterinario_crud import veterinario
 from app.models.consulta import Consulta
@@ -152,7 +152,7 @@ async def create_cita(
 
         # Verificar que el servicio existe
         from app.crud.consulta_crud import servicio_solicitado
-        from app.crud.consulta_crud import cita
+
         servicio_obj = servicio_solicitado.get(db, cita_data.id_servicio_solicitado)
         if not servicio_obj:
             raise HTTPException(
@@ -163,7 +163,6 @@ async def create_cita(
         # Crear la cita
         cita_dict = cita_data.dict()
         cita_dict['estado_cita'] = 'Programada'  # Estado inicial
-        from app.crud.consulta_crud import cita
         nueva_cita = cita.create(db, obj_in=cita_dict)
 
         return nueva_cita
@@ -194,7 +193,7 @@ async def get_citas(
         if estado:
             citas = cita.get_by_estado(db, estado=estado)
         elif mascota_id:
-            citas = db.query(cita.Cita).filter(cita.Cita.id_mascota == mascota_id).limit(limit).all()
+            citas = db.query(cita).filter(cita.id_mascota == mascota_id).limit(limit).all()
         else:
             citas = cita.get_multi(db, limit=limit)
 
