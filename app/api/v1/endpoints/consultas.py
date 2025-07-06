@@ -799,7 +799,7 @@ async def finalizar_consulta(
             detail=f"Error al finalizar consulta: {str(e)}"
         )
 
-from app.crud.consulta_crud import CRUDCita
+from app.crud.consulta_crud import cita
 # ==============================
 # 1. Crear cita
 # ==============================
@@ -834,8 +834,8 @@ async def create_cita(
         # Crear la cita
         cita_dict = cita_data.dict()
         cita_dict['estado_cita'] = 'Programada'  # Estado inicial
-        from app.crud.consulta_crud import CRUDCita
-        nueva_cita = CRUDCita.create(db, obj_in=cita_dict)
+        from app.crud.consulta_crud import cita
+        nueva_cita = cita.create(db, obj_in=cita_dict)
 
         return nueva_cita
 
@@ -863,11 +863,11 @@ async def get_citas(
     """
     try:
         if estado:
-            citas = CRUDCita.get_by_estado(db, estado=estado)
+            citas = cita.get_by_estado(db, estado=estado)
         elif mascota_id:
-            citas = db.query(CRUDCita.Cita).filter(CRUDCita.Cita.id_mascota == mascota_id).limit(limit).all()
+            citas = db.query(cita.Cita).filter(cita.Cita.id_mascota == mascota_id).limit(limit).all()
         else:
-            citas = CRUDCita.get_multi(db, limit=limit)
+            citas = cita.get_multi(db, limit=limit)
 
         return citas[:limit]
 
@@ -890,7 +890,8 @@ async def get_cita(
     Obtener una cita específica por ID
     """
     try:
-        cita = CRUDCita.get(db, cita_id)
+        from app.crud.consulta_crud import cita
+        cita = cita.get(db, cita_id)
         if not cita:
             raise HTTPException(
                 status_code=404,
