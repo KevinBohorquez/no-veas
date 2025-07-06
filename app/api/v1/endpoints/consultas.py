@@ -128,21 +128,20 @@ async def get_solicitud_atencion(
             detail=f"Error al obtener solicitud: {str(e)}"
         )
 
-from app.crud.consulta_crud import cita
-# ==============================
+# ================================================================
 # 1. Crear cita
-# ==============================
-@router.post("/cita", response_model=CitaResponse, status_code=status.HTTP_201_CREATED)
+# ================================================================
+@router.post("/", response_model=CitaResponse, status_code=status.HTTP_201_CREATED)
 async def create_cita(
-        cita_data: CitaCreate,
-        db: Session = Depends(get_db)
+    cita_data: CitaCreate,
+    db: Session = Depends(get_db)
 ):
     """
     Crear una nueva cita programada
     """
     try:
         # Verificar que la mascota existe
-        from app.crud import mascota
+        from app.crud.mascota_crud import mascota
         mascota_obj = mascota.get(db, cita_data.id_mascota)
         if not mascota_obj:
             raise HTTPException(
@@ -150,19 +149,19 @@ async def create_cita(
                 detail="Mascota no encontrada"
             )
 
-        # Verificar que el servicio existe
-        from app.crud.consulta_crud import servicio_solicitado
-
-        servicio_obj = servicio_solicitado.get(db, cita_data.id_servicio_solicitado)
-        if not servicio_obj:
-            raise HTTPException(
-                status_code=400,
-                detail="Servicio solicitado no encontrado"
-            )
+        # Verificar que el servicio solicitado existe
+        if cita_data.id_servicio_solicitado:
+            from app.crud.consulta_crud import servicio_solicitado
+            servicio_obj = servicio_solicitado.get(db, cita_data.id_servicio_solicitado)
+            if not servicio_obj:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Servicio solicitado no encontrado"
+                )
 
         # Crear la cita
         cita_dict = cita_data.dict()
-        cita_dict['estado_cita'] = 'Programada'  # Estado inicial
+        cita_dict["estado_cita"] = "Programada"
         nueva_cita = cita.create(db, obj_in=cita_dict)
 
         return nueva_cita
@@ -175,25 +174,29 @@ async def create_cita(
             detail=f"Error al crear cita: {str(e)}"
         )
 
-
-# ==============================
+# ================================================================
 # 2. Obtener lista de citas
-# ==============================
-@router.get("/cita", response_model=List[CitaResponse])
+# ================================================================
+@router.get("/", response_model=List[CitaResponse])
 async def get_citas(
-        db: Session = Depends(get_db),
-        estado: Optional[str] = Query(None, description="Filtrar por estado de la cita"),
-        mascota_id: Optional[int] = Query(None, description="Filtrar por mascota"),
-        limit: int = Query(50, ge=1, le=100, description="Límite de resultados")
+    db: Session = Depends(get_db),
+    estado: Optional[str] = Query(None, description="Filtrar por estado"),
+    mascota_id: Optional[int] = Query(None, description="Filtrar por mascota"),
+    servicio_solicitado_id: Optional[int] = Query(None, description="Filtrar por servicio solicitado"),
+    limit: int = Query(50, ge=1, le=100, description="Límite de resultados")
 ):
     """
-    Obtener lista de citas programadas
+    Obtener lista de citas
     """
     try:
         if estado:
-            citas = cita.get_by_estado(db, estado=estado)
+            citas = cita.get_by_estado(db, estado_cita=estado)
         elif mascota_id:
-            citas = db.query(cita).filter(cita.id_mascota == mascota_id).limit(limit).all()
+            citas = cita.get_by_mascota(db, mascota_id=mascota_id)
+        elif servicio_solicitado_id:
+            citas = db.query(cita.model).filter(
+                cita.model.id_servicio_solicitado == servicio_solicitado_id
+            ).order_by(cita.model.fecha_hora_programada).limit(limit).all()
         else:
             citas = cita.get_multi(db, limit=limit)
 
@@ -205,27 +208,25 @@ async def get_citas(
             detail=f"Error al obtener citas: {str(e)}"
         )
 
-
-# ==============================
+# ================================================================
 # 3. Obtener cita por ID
-# ==============================
-@router.get("/cita/{cita_id}", response_model=CitaResponse)
+# ================================================================
+@router.get("/{cita_id}", response_model=CitaResponse)
 async def get_cita(
-        cita_id: int,
-        db: Session = Depends(get_db)
+    cita_id: int,
+    db: Session = Depends(get_db)
 ):
     """
     Obtener una cita específica por ID
     """
     try:
-        from app.crud.consulta_crud import cita
-        cita = cita.get(db, cita_id)
-        if not cita:
+        cita_obj = cita.get(db, cita_id)
+        if not cita_obj:
             raise HTTPException(
                 status_code=404,
                 detail="Cita no encontrada"
             )
-        return cita
+        return cita_obj
 
     except HTTPException:
         raise

@@ -8,7 +8,6 @@ class Cita(Base):
 
     id_cita = Column(Integer, primary_key=True, autoincrement=True)
     id_mascota = Column(Integer, ForeignKey('Mascota.id_mascota'))
-    id_servicio = Column(Integer, ForeignKey('Servicio.id_servicio'))
     id_servicio_solicitado = Column(Integer, ForeignKey('Servicio_Solicitado.id_servicio_solicitado'))
     
     fecha_hora_programada = Column(DateTime, nullable=False)
