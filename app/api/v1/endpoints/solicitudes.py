@@ -61,34 +61,34 @@ async def create_solicitud_atencion(
         )
 
 
-    @router.get("/", response_model=List[SolicitudAtencionResponse])
-    async def get_solicitudes_atencion(
-            db: Session = Depends(get_db),
-            estado: Optional[str] = Query(None, description="Filtrar por estado"),
-            tipo_solicitud: Optional[str] = Query(None, description="Filtrar por tipo"),
-            mascota_id: Optional[int] = Query(None, description="Filtrar por mascota"),
-            limit: int = Query(50, ge=1, le=100, description="Límite de resultados")
-    ):
-        """
-        Obtener lista de solicitudes de atención con filtros
-        """
-        try:
-            if estado:
-                solicitudes = solicitud_atencion.get_by_estado(db, estado=estado)
-            elif tipo_solicitud:
-                solicitudes = solicitud_atencion.get_by_tipo(db, tipo_solicitud=tipo_solicitud)
-            elif mascota_id:
-                solicitudes = solicitud_atencion.get_by_mascota(db, mascota_id=mascota_id)
-            else:
-                solicitudes = solicitud_atencion.get_multi(db, limit=limit)
+@router.get("/", response_model=List[SolicitudAtencionResponse])
+async def get_solicitudes_atencion(
+        db: Session = Depends(get_db),
+        estado: Optional[str] = Query(None, description="Filtrar por estado"),
+        tipo_solicitud: Optional[str] = Query(None, description="Filtrar por tipo"),
+        mascota_id: Optional[int] = Query(None, description="Filtrar por mascota"),
+        limit: int = Query(50, ge=1, le=100, description="Límite de resultados")
+):
+    """
+    Obtener lista de solicitudes de atención con filtros
+    """
+    try:
+        if estado:
+            solicitudes = solicitud_atencion.get_by_estado(db, estado=estado)
+        elif tipo_solicitud:
+            solicitudes = solicitud_atencion.get_by_tipo(db, tipo_solicitud=tipo_solicitud)
+        elif mascota_id:
+            solicitudes = solicitud_atencion.get_by_mascota(db, mascota_id=mascota_id)
+        else:
+            solicitudes = solicitud_atencion.get_multi(db, limit=limit)
 
-            return solicitudes[:limit]
+        return solicitudes[:limit]
 
-        except Exception as e:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Error al obtener solicitudes: {str(e)}"
-            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener solicitudes: {str(e)}"
+        )
 
 
 @router.get("/{solicitud_id}", response_model=SolicitudAtencionResponse)
