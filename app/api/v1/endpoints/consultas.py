@@ -27,7 +27,7 @@ router = APIRouter()
 
 # ===== RUTAS ESPECÍFICAS PRIMERO (ANTES DE LAS RUTAS CON PARÁMETROS) =====
 
-@router.post("/solicitudes/", response_model=SolicitudAtencionResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/solicitudes", response_model=SolicitudAtencionResponse, status_code=status.HTTP_201_CREATED)
 async def create_solicitud_atencion(
         solicitud_data: SolicitudAtencionCreate,
         db: Session = Depends(get_db)
@@ -73,7 +73,7 @@ async def create_solicitud_atencion(
         )
 
 
-@router.get("/solicitudes/", response_model=List[SolicitudAtencionResponse])
+@router.get("/solicitudes", response_model=List[SolicitudAtencionResponse])
 async def get_solicitudes_atencion(
         db: Session = Depends(get_db),
         estado: Optional[str] = Query(None, description="Filtrar por estado"),
