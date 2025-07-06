@@ -102,6 +102,77 @@ async def get_solicitudes_atencion(
         )
 
 
+@router.get("/solicitudes/{solicitud_id}", response_model=SolicitudAtencionResponse)
+async def get_solicitud_atencion(
+        solicitud_id: int,
+        db: Session = Depends(get_db)
+):
+    """
+    Obtener una solicitud específica por ID
+    """
+    try:
+        solicitud = solicitud_atencion.get(db, solicitud_id)
+        if not solicitud:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Solicitud no encontrada"
+            )
+        return solicitud
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener solicitud: {str(e)}"
+        )
+
+
+# OPCIONAL: Endpoint para actualizar estado de solicitud
+@router.patch("/solicitudes/{solicitud_id}/estado")
+async def actualizar_estado_solicitud(
+        solicitud_id: int,
+        nuevo_estado: str = Query(..., description="Nuevo estado de la solicitud"),
+        db: Session = Depends(get_db)
+):
+    """
+    Actualizar el estado de una solicitud
+    """
+    try:
+        # Validar que el estado es válido
+        estados_validos = ['Pendiente', 'En triaje', 'En atencion', 'Completada', 'Cancelada']
+        if nuevo_estado not in estados_validos:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Estado inválido. Debe ser uno de: {', '.join(estados_validos)}"
+            )
+
+        solicitud_actualizada = solicitud_atencion.cambiar_estado(
+            db,
+            solicitud_id=solicitud_id,
+            nuevo_estado=nuevo_estado
+        )
+
+        if not solicitud_actualizada:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Solicitud no encontrada"
+            )
+
+        return {
+            "message": "Estado actualizado exitosamente",
+            "solicitud": solicitud_actualizada
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al actualizar estado: {str(e)}"
+        )
+
+
 @router.get("/search")
 async def search_consultas_endpoint(
         db: Session = Depends(get_db),
