@@ -20,7 +20,6 @@ from app.api.v1.endpoints.usuarios import router as usuarios_router
 from app.api.v1.endpoints.administradores import router as administradores_router
 from app.api.v1.endpoints.catalogos import router as catalogos_router
 from app.api.v1.endpoints.consultas import router as consultas_router
-from app.api.v1.endpoints.solicitudes import router as solicitudes_router
 
 app = FastAPI(
     title="🏥 Sistema Veterinaria API Completo",
@@ -60,8 +59,6 @@ app.include_router(catalogos_router, prefix="/api/v1/catalogos", tags=["📋 cat
 
 # Procesos clínicos
 app.include_router(consultas_router, prefix="/api/v1/consultas", tags=["🏥 consultas"])
-
-app.include_router(solicitudes_router, prefix="/api/v1/solicitudes", tags=["🏥 solicitudes"])
 
 # ===== ENDPOINTS PRINCIPALES =====
 
