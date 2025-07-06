@@ -187,7 +187,6 @@ class TratamientoResponse(BaseResponse):
 class CitaCreate(BaseModel):
     """Schema para crear cita"""
     id_mascota: int
-    id_servicio: int
     fecha_hora_programada: datetime
     id_servicio_solicitado: Optional[int] = None
     requiere_ayuno: Optional[bool] = None
@@ -218,7 +217,6 @@ class CitaResponse(BaseResponse):
     """Schema para respuesta de cita"""
     id_cita: int
     id_mascota: int
-    id_servicio: int
     id_servicio_solicitado: Optional[int]
     fecha_hora_programada: datetime
     estado_cita: str
