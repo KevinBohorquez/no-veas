@@ -54,6 +54,8 @@ app.include_router(administradores_router, prefix="/api/v1/administradores", tag
 # Gestión de mascotas
 app.include_router(mascotas_router, prefix="/api/v1/mascotas", tags=["🐕 mascotas"])
 
+app.include_router(so)
+
 # Catálogos del sistema
 app.include_router(catalogos_router, prefix="/api/v1/catalogos", tags=["📋 catálogos"])
 

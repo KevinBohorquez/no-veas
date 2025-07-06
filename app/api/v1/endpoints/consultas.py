@@ -75,8 +75,6 @@ async def get_solicitudes_atencion(
         estado: Optional[str] = Query(None, description="Filtrar por estado"),
         tipo_solicitud: Optional[str] = Query(None, description="Filtrar por tipo"),
         mascota_id: Optional[int] = Query(None, description="Filtrar por mascota"),
-        fecha_desde: Optional[date] = Query(None, description="Fecha desde"),
-        fecha_hasta: Optional[date] = Query(None, description="Fecha hasta"),
         limit: int = Query(50, ge=1, le=100, description="Límite de resultados")
 ):
     """
@@ -92,25 +90,38 @@ async def get_solicitudes_atencion(
         else:
             solicitudes = solicitud_atencion.get_multi(db, limit=limit)
 
-        # Filtrar por fechas si se proporcionan
-        if fecha_desde or fecha_hasta:
-            solicitudes_filtradas = []
-            for sol in solicitudes:
-                if sol.fecha_hora_solicitud:
-                    fecha_sol = sol.fecha_hora_solicitud.date()
-                    if fecha_desde and fecha_sol < fecha_desde:
-                        continue
-                    if fecha_hasta and fecha_sol > fecha_hasta:
-                        continue
-                    solicitudes_filtradas.append(sol)
-            solicitudes = solicitudes_filtradas
-
         return solicitudes[:limit]
 
     except Exception as e:
         raise HTTPException(
             status_code=500,
             detail=f"Error al obtener solicitudes: {str(e)}"
+        )
+
+
+@router.get("/solicitudes/{solicitud_id}", response_model=SolicitudAtencionResponse)
+async def get_solicitud_atencion(
+        solicitud_id: int,
+        db: Session = Depends(get_db)
+):
+    """
+    Obtener una solicitud específica por ID
+    """
+    try:
+        solicitud = solicitud_atencion.get(db, solicitud_id)
+        if not solicitud:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Solicitud no encontrada"
+            )
+        return solicitud
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al obtener solicitud: {str(e)}"
         )
 
 @router.post("/", response_model=ConsultaResponse, status_code=status.HTTP_201_CREATED)
