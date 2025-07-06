@@ -23,7 +23,24 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     def get(self, db: Session, id: Any) -> Optional[ModelType]:
         """Obtener por ID"""
         # Intentar obtener el campo de ID dinámicamente
-        id_field = f"id_{self.model.__tablename__.lower()}"
+        id_field = None
+        # Probar con varias convenciones de nombre
+        for candidate in [
+            f"id_{self.model.__tablename__.lower()}",
+            f"id_{self.model.__tablename__.lower().replace('_', '')}",
+            "id",
+            "id_solicitud",
+            "id_cita",
+        ]:
+            if hasattr(self.model, candidate):
+                id_field = candidate
+                break
+
+        if id_field:
+            return db.query(self.model).filter(getattr(self.model, id_field) == id).first()
+        else:
+            raise Exception("No se pudo determinar el campo de ID")
+
         if hasattr(self.model, id_field):
             return db.query(self.model).filter(getattr(self.model, id_field) == id).first()
         else:
