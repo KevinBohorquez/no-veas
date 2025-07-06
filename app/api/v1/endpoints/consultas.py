@@ -102,32 +102,6 @@ async def get_solicitudes_atencion(
         )
 
 
-@router.get("/solicitudes/{solicitud_id}", response_model=SolicitudAtencionResponse)
-async def get_solicitud_atencion(
-        solicitud_id: int,
-        db: Session = Depends(get_db)
-):
-    """
-    Obtener una solicitud específica por ID
-    """
-    try:
-        solicitud = solicitud_atencion.get(db, solicitud_id)
-        if not solicitud:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Solicitud no encontrada"
-            )
-        return solicitud
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error al obtener solicitud: {str(e)}"
-        )
-
-
 @router.get("/search")
 async def search_consultas_endpoint(
         db: Session = Depends(get_db),
